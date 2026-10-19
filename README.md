@@ -18,6 +18,7 @@ Tony published 1017 on **four** Sparks (`boot1017g`, 300K). Magnus published 8-w
 | Context window | Cap `1048576`. Needle passed near the start, middle, and end. Prompts were 1,042,741 / 1,042,513 / 1,042,394 tokens. See [results/needle-1m.md](results/needle-1m.md). |
 | Bite | `--max-num-batched-tokens 2048`. 1024 will not boot with vision on (image token budget is 1025). |
 | API | head `:8888`, ids `deepseek-v4.1-flash-1017` and `deepseek-v4.1-flash` |
+| Same questions | 7/7 against DeepSeek's own API, thinking off, 2026-10-19. Not their 69-question suite. See [results/same-questions.md](results/same-questions.md). |
 
 The serving bite is 2048. A 1024 bite dies at startup with vision on. The speed table is this boot, same process as the needle.
 
