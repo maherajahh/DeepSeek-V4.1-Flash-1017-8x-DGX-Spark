@@ -11,8 +11,10 @@ Verified 2026-10-19.
 | Image id | `sha256:c92feb5ffab6f15cb5d1330abd448ef1664a6f13bfeae616982b73bf2a4baaf9` |
 | Server fingerprint | `vllm-0.28.1rc1.dev388+g8a728663c-tp8-d428ca86` |
 | TEXT_ONLY | `0` |
-| GMU / max-model-len | `0.75` / `1048576` (configured; no 1M needle) |
-| max-num-batched-tokens | `8192` |
+| GMU / max-model-len | `0.75` / `1048576` |
+| max-num-batched-tokens | `2048` (1024 will not boot with vision on) |
+| Needle | target 1048576, prompt 1042513, pass, bite 2048 |
 | Fabric | `10.99.20.1`–`.8` rank 0–7 (`FAB_IPS` overrides) |
-| Bench | Tony `bench/v41bench.py`, label `tp8-1017-1m` |
+| Bench | Tony `bench/v41bench.py`, label `tp8-1017-1m` (earlier 8192-bite boot) |
 | Vision smoke | 32×32 red PNG → `Red` (`chatcmpl-9c40078ae228297e`) |
+| Tool smoke | `get_weather` Paris, c (`chatcmpl-bc594f0258ada5f5`) |

@@ -36,7 +36,7 @@ for ip in "${FAB[@]:1}"; do
   copy_to "$ip"
 done
 
-ENVS="export TEXT_ONLY=0 SERVED_NAMES=\"deepseek-v4.1-flash-1017 deepseek-v4.1-flash\" MODEL_DIR=DeepSeek-V4.1-Flash-1017 GMU=0.75 MAXLEN=1048576 EXP_NAME=boot1017-1m PATCH_DIR=\$HOME/dsv41-recipe/patch IMAGE=vllm-dsv41:overlay5 ENGRAM_LOCAL=0 FAB_IPS=\"${FAB_IPS}\" NCCL_IB_ADDR_RANGE=\"${NCCL_IB_ADDR_RANGE}\" NCCL_EXTRA=\"-e NCCL_MAX_NCHANNELS=8 -e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False\""
+ENVS="export TEXT_ONLY=0 SERVED_NAMES=\"deepseek-v4.1-flash-1017 deepseek-v4.1-flash\" MODEL_DIR=DeepSeek-V4.1-Flash-1017 GMU=0.75 MAXLEN=1048576 MAX_BATCHED=2048 EXP_NAME=boot1017-1m-bite2048 PATCH_DIR=\$HOME/dsv41-recipe/patch IMAGE=vllm-dsv41:overlay5 ENGRAM_LOCAL=0 FAB_IPS=\"${FAB_IPS}\" NCCL_IB_ADDR_RANGE=\"${NCCL_IB_ADDR_RANGE}\" NCCL_EXTRA=\"-e NCCL_MAX_NCHANNELS=8 -e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False\""
 
 for r in 7 6 5 4 3 2 1; do
   ip="${FAB[$r]}"

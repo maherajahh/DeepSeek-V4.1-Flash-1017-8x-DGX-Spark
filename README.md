@@ -14,18 +14,18 @@ Tony published 1017 on **four** Sparks (`boot1017g`, 300K). Magnus published 8-w
 | Hardware | 8× DGX Spark, dual fat rear links. Measured fabric `10.99.20.1`–`.8`. Edit `FAB_IPS` for another lab. |
 | Engine | vLLM `vllm-dsv41:overlay5`, Tony patches, TP=8 |
 | Vision | on (`TEXT_ONLY=0`). One proof: 32×32 red PNG → `Red`. See [results/vision-1017.md](results/vision-1017.md). |
-| Tools | parsers on. Not a tool-call eval. |
-| Context window | API reports `1048576` (`GMU=0.75`). That is the configured max, not a needle test. |
-| Longest measured prompt | 93,335 tokens (cold prefill below). No 1M retrieval test in this repo. |
+| Tools | one call on this boot: `get_weather` for Paris, celsius. Not a tool-call eval. |
+| Context window | Cap `1048576`. Needle target 1,048,576 passed at **1,042,513** prompt tokens. See [results/needle-1m.md](results/needle-1m.md). |
+| Bite | `--max-num-batched-tokens 2048`. 1024 will not boot with vision on (image token budget is 1025). |
 | API | head `:8888`, ids `deepseek-v4.1-flash-1017` and `deepseek-v4.1-flash` |
 
-The live server batches up to 8192 tokens (`--max-num-batched-tokens 8192`). A 1M prompt at that chunk size is a memory spike this repo has not run, and will not claim.
+The serving bite is 2048, not 8192. A 1024 bite dies at startup with vision on. The speed table below is the earlier 8192-bite boot. It is not this 2048 boot.
 
 ## Measured (Tony `v41bench.py`, prompt set v1, temperature 0, thinking off)
 
 Same harness Tony used for 1017g. Counting ceiling excluded from the 8-category mean. His column is 4 Sparks at 300K. This column is 8 Sparks with the window set to 1M. Extra boxes help. They do not double decode. This is not a TensorFold comparison. Tony’s TensorFold 4-Spark lane is still faster than this vLLM lane.
 
-| C | this boot (8×, window 1M) | Tony 1017g (4×, 300K) |
+| C | earlier boot (8×, window 1M, bite 8192) | Tony 1017g (4×, 300K) |
 |---|---|---|
 | C1 aggregate tok/s | **57.3** | 48.5 |
 | C2 | **93.1** | 76.6 |
@@ -46,8 +46,9 @@ Raw: [results/bench-tp8-1017-1m.md](results/bench-tp8-1017-1m.md), [results/benc
 - Not Magnus’s uncensored checkpoint
 - Not TensorFold / EXL3
 - Not “we invented 8-wide DeepSeek”
-- Not a 1M needle proof
 - Not a vision benchmark (one red square)
+- Not a tool-call benchmark (one call)
+- Not "the prompt was exactly 1,048,576 tokens" (the harness used 1,042,513; the cap is 1,048,576)
 
 ## Clone and serve
 
@@ -67,7 +68,7 @@ export SSH_USER="$USER"
 curl -s http://127.0.0.1:8888/v1/models
 ```
 
-Measured flags, already what the boot script exports: `GMU=0.75`, `MAXLEN=1048576`, bite `--max-num-batched-tokens 8192`. The window is set to 1,048,576. A 1M prompt at that bite is not safe. Longest measured prompt is 93,335 tokens.
+Measured flags in `launch/boot-1017-1m.sh`: `GMU=0.75`, `MAXLEN=1048576`, bite `MAX_BATCHED=2048`. 1024 will not start with vision on. The needle that passed used this 2048 bite.
 
 `doctor.sh` refuses to call the boot ready unless every node has the image tag, 48 shards, Tony's checkout at `a2664a7`, and an Up RoCE device. The launcher prints the NIC it picked. Office names (`rocep1s0f0,roceP2p1s0f0` / `enp1s0f0np0`) are the fallback when those devices are Up.
 
@@ -75,7 +76,7 @@ Hand launch, if you are not using the boot script:
 
 ```bash
 export TEXT_ONLY=0 SERVED_NAMES="deepseek-v4.1-flash-1017 deepseek-v4.1-flash" \
-  MODEL_DIR=DeepSeek-V4.1-Flash-1017 GMU=0.75 MAXLEN=1048576 EXP_NAME=boot1017-1m \
+  MODEL_DIR=DeepSeek-V4.1-Flash-1017 GMU=0.75 MAXLEN=1048576 MAX_BATCHED=2048 EXP_NAME=boot1017-1m-bite2048 \
   PATCH_DIR=$HOME/dsv41-recipe/patch IMAGE=vllm-dsv41:overlay5 ENGRAM_LOCAL=0 \
   FAB_IPS="$FAB_IPS" NCCL_IB_ADDR_RANGE=10.99.20.0/24 \
   NCCL_EXTRA="-e NCCL_MAX_NCHANNELS=8 -e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False"
