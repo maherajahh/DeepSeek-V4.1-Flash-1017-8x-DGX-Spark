@@ -23,6 +23,6 @@ Order is load-bearing. Do not reorder in public posts.
 
 ## 5. This notebook
 
-- Lab: 8× DGX Spark (GB10). Operator: trx696.
+- Lab: 8× DGX Spark (GB10). Public notes: [maherajahh](https://github.com/maherajahh).
 
 If a public sentence sounds like we invented 8-wide DeepSeek serving, it is wrong. Fix it.

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# dsv41-tp8.sh <rank>  -- DeepSeek-V4.1-Flash (dealignai UNCENSORED-FP8) TP8 across 8 DGX Spark GB10.
+# dsv41-tp8.sh <rank>  -- official DeepSeek-V4.1-Flash-1017, TP8, 8x DGX Spark GB10.
 #
 # Derived from tonyd2wild/DeepSeek-V4.1-Flash-vLLM-DGX-Spark launch/dsv41-tp4.sh (Tech2Wild/Kai, 2026-09-10).
 # Changed ONLY where eight nodes and our fabric differ from his four:
-#   - 8 ranks, our fabric IPs, RoCE GID index probed per NIC, our NCCL env (same pattern as our GLM job)
+#   - 8 ranks, fabric IPs (FAB_IPS), RoCE GID index probed per NIC, NCCL env for this 8-rank fabric
 #   - weights node-local on every rank (no NFS), so ENGRAM_LOCAL defaults to 0 (rows are already local)
 #   - --tensor-parallel-size 8 --nnodes 8; API on :8888 so the client config only changes the model id
 #   - EP=1 knob adds --enable-expert-parallel (gate for the moe_intermediate_size/8 question)
@@ -35,12 +35,11 @@
 #   PATCH_DIR    default $HOME/dsv41-recipe/patch (Tony's repo clone; mounts.txt lives there)
 #   VLLM_EXTRA   extra vllm serve args;  NCCL_EXTRA extra "-e K=V" docker env pairs
 #   DRYRUN       1 => run every check as a warning and print the docker command instead of starting it
-#   DRAFT_SAMPLE dspark draft sampler: probabilistic (default, Tony's boot 10) | greedy (vLLM's default; neko-legends measured
-#                +25-36% single-stream on the same uncensored checkpoint family with acceptance unchanged; validate quality first)
+#   DRAFT_SAMPLE dspark draft sampler: probabilistic (default, matches this boot's bench) | greedy
 #   NCCL_TUNED   1 => 8 channels, 1 MiB buffers, LL128 off (rhys101's 8x Spark A/B: +20-26% aggregate, ~11 GiB/node back;
 #                LL128 off is also a correctness guard on GB10: NCCL #2001/#2053). Default 0 until measured here.
-#   SERVED_NAMES model ids the API answers to (space-separated; first = primary). Default gives the uncensored build its own
-#                id so clients with a built-in "deepseek-v4.1-flash" entry (dsh) do not collide, plus the plain id as an alias
+#   SERVED_NAMES model ids the API answers to (space-separated; first = primary). Default is the official 1017 id
+#                plus deepseek-v4.1-flash. Do not default this to an uncensored name.
 #   TP           tensor-parallel size = node count of this job (default 8). TP=4 BASE=4 PORT=8889 MPORT=29552 runs a
 #                second, independent four-node job on ranks .14-.17 (Tony's exact TP4 shape, for A/B against TP8)
 #   BASE         index of this job's first node in FAB (default 0); rank r runs on FAB[BASE+r]
@@ -48,7 +47,7 @@
 set -euo pipefail
 NODE_RANK="${1:?usage: dsv41-tp8.sh <rank>}"
 DRYRUN="${DRYRUN:-0}"
-SERVED_NAMES="${SERVED_NAMES:-dsv41-flash-uncensored deepseek-v4.1-flash}"
+SERVED_NAMES="${SERVED_NAMES:-deepseek-v4.1-flash-1017 deepseek-v4.1-flash}"
 DRAFT_SAMPLE="${DRAFT_SAMPLE:-probabilistic}"
 NCCL_TUNED="${NCCL_TUNED:-0}"
 TP="${TP:-8}"; BASE="${BASE:-0}"
@@ -85,10 +84,14 @@ SITE="/usr/local/lib/python3.12/dist-packages/vllm"
 TOK_ARGS=""
 case "$IMAGE" in *deepseekv41-flash-0909*) TOK_ARGS="--tokenizer-mode deepseek_v41" ;; esac
 
-# ---- rank -> fabric IP (same map as the GLM job) ----
-FAB=(10.99.20.1 10.99.20.2 10.99.20.3 10.99.20.4 \
-     10.99.20.5 10.99.20.6 10.99.20.7 10.99.20.8)
-[ "$NODE_RANK" -ge 0 ] && [ "$NODE_RANK" -lt "$TP" ] && [ $((BASE + TP)) -le 8 ] || { echo "rank must be 0..TP-1 and BASE+TP <= 8" >&2; exit 2; }
+# ---- rank -> fabric IP. Override with FAB_IPS="ip0 ip1 ..."; rank r uses FAB[BASE+r]. ----
+if [ -n "${FAB_IPS:-}" ]; then
+  read -r -a FAB <<< "$FAB_IPS"
+else
+  FAB=(10.99.20.1 10.99.20.2 10.99.20.3 10.99.20.4 \
+       10.99.20.5 10.99.20.6 10.99.20.7 10.99.20.8)
+fi
+[ "$NODE_RANK" -ge 0 ] && [ "$NODE_RANK" -lt "$TP" ] && [ $((BASE + TP)) -le ${#FAB[@]} ] || { echo "rank must be 0..TP-1 and BASE+TP <= ${#FAB[@]} (set FAB_IPS)" >&2; exit 2; }
 HOST_IP="${FAB[$((BASE + NODE_RANK))]}"
 HEAD_IP="${FAB[$BASE]}"; MPORT="${MPORT:-29551}"; PORT="${PORT:-8888}"
 [ "$NODE_RANK" = "0" ] && HEADLESS="" || HEADLESS="--headless"
@@ -136,7 +139,7 @@ if [ "$DRYRUN" = 1 ]; then DOCKER="echo DRYRUN: docker"; else
   sync; echo 3 | sudo -n tee /proc/sys/vm/drop_caches >/dev/null || echo "WARN: page-cache drop denied (sudoers rule missing?)" >&2
 fi
 AVAIL_GB=$(( $(grep MemAvailable /proc/meminfo | awk '{print $2}') / 1048576 ))
-[ "$AVAIL_GB" -ge 100 ] || die "MemAvailable ${AVAIL_GB} GiB < 100 GiB, refusing to boot (is the GLM job still up?)" 4
+[ "$AVAIL_GB" -ge 100 ] || die "MemAvailable ${AVAIL_GB} GiB < 100 GiB, refusing to boot (another job is still holding memory)" 4
 
 GRAPH_ENV=""
 if [ "$EAGER" = "1" ]; then
@@ -180,7 +183,7 @@ $DOCKER run --gpus all -d --name "$NAME" --restart no \
   $ENGRAM_ENV $GRAPH_ENV \
   -e TORCH_CUDA_ARCH_LIST=12.1a -e FLASHINFER_CUDA_ARCH_LIST=12.1a -e FLASHINFER_DISABLE_VERSION_CHECK=1 \
   -e NCCL_NET=IB -e NCCL_IB_DISABLE=0 -e NCCL_IB_HCA=rocep1s0f0,roceP2p1s0f0 -e NCCL_IB_GID_INDEX=$GIDX \
-  -e NCCL_IB_ROCE_VERSION_NUM=2 -e NCCL_IB_ADDR_FAMILY=AF_INET -e NCCL_IB_ADDR_RANGE=10.99.20.0/24 \
+  -e NCCL_IB_ROCE_VERSION_NUM=2 -e NCCL_IB_ADDR_FAMILY=AF_INET -e NCCL_IB_ADDR_RANGE=${NCCL_IB_ADDR_RANGE:-10.99.20.0/24} \
   -e NCCL_SOCKET_IFNAME=enp1s0f0np0 -e GLOO_SOCKET_IFNAME=enp1s0f0np0 -e TP_SOCKET_IFNAME=enp1s0f0np0 -e MN_IF_NAME=enp1s0f0np0 \
   -e NCCL_CROSS_NIC=1 -e NCCL_NVLS_ENABLE=0 -e NCCL_IB_MERGE_NICS=0 -e NCCL_CUMEM_ENABLE=0 \
   -e NCCL_IGNORE_CPU_AFFINITY=1 ${NCCL_BUFFSIZE:+-e NCCL_BUFFSIZE=$NCCL_BUFFSIZE} -e NCCL_DEBUG=WARN -e TORCH_NCCL_ASYNC_ERROR_HANDLING=1 \
