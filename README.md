@@ -13,32 +13,32 @@ Tony published 1017 on **four** Sparks (`boot1017g`, 300K). Magnus published 8-w
 | Model | `deepseek-ai/DeepSeek-V4.1-Flash-1017` (official) |
 | Hardware | 8× DGX Spark, dual fat rear links. Measured fabric `10.99.20.1`–`.8`. Edit `FAB_IPS` for another lab. |
 | Engine | vLLM `vllm-dsv41:overlay5`, Tony patches, TP=8 |
-| Vision | on (`TEXT_ONLY=0`). One proof: 32×32 red PNG → `Red`. See [results/vision-1017.md](results/vision-1017.md). |
+| Vision | on (`TEXT_ONLY=0`). This boot: 32×32 red PNG → `Red` (`chatcmpl-8fdede4108600eaa`). |
 | Tools | one call on this boot: `get_weather` for Paris, celsius. Not a tool-call eval. |
 | Context window | Cap `1048576`. Needle target 1,048,576 passed at **1,042,513** prompt tokens. See [results/needle-1m.md](results/needle-1m.md). |
 | Bite | `--max-num-batched-tokens 2048`. 1024 will not boot with vision on (image token budget is 1025). |
 | API | head `:8888`, ids `deepseek-v4.1-flash-1017` and `deepseek-v4.1-flash` |
 
-The serving bite is 2048, not 8192. A 1024 bite dies at startup with vision on. The speed table below is the earlier 8192-bite boot. It is not this 2048 boot.
+The serving bite is 2048. A 1024 bite dies at startup with vision on. The speed table is this boot, same process as the needle.
 
 ## Measured (Tony `v41bench.py`, prompt set v1, temperature 0, thinking off)
 
-Same harness Tony used for 1017g. Counting ceiling excluded from the 8-category mean. His column is 4 Sparks at 300K. This column is 8 Sparks with the window set to 1M. Extra boxes help. They do not double decode. This is not a TensorFold comparison. Tony’s TensorFold 4-Spark lane is still faster than this vLLM lane.
+Same harness Tony used for 1017g. Counting ceiling excluded from the 8-category mean. His column is 4 Sparks at 300K, bite not ours. This column is 8 Sparks, window cap 1,048,576, bite 2048. Extra boxes help. They do not double decode. Long prompts are slower at this bite than on the earlier 8192 boot. This is not a TensorFold comparison. Tony’s TensorFold 4-Spark lane is still faster than this vLLM lane.
 
-| C | earlier boot (8×, window 1M, bite 8192) | Tony 1017g (4×, 300K) |
+| C | this boot (8×, cap 1M, bite 2048) | Tony 1017g (4×, 300K) |
 |---|---|---|
-| C1 aggregate tok/s | **57.3** | 48.5 |
-| C2 | **93.1** | 76.6 |
-| C3 | **120.7** | 102.6 |
-| C4 | **147.4** | 123.2 |
-| C5 | **166.5** | 144.6 |
-| C6 | **186.4** | 165.7 |
-| C1 mean TTFT (s) | **0.25** | 0.28 |
-| Cold prefill ~93K | **2183 tok/s** (43s) | ~42s on his writeup |
+| C1 aggregate tok/s | **54.8** | 48.5 |
+| C2 | **87.3** | 76.6 |
+| C3 | **117.9** | 102.6 |
+| C4 | **143.8** | 123.2 |
+| C5 | **158.8** | 144.6 |
+| C6 | **173.0** | 165.7 |
+| C1 mean TTFT (s) | **0.26** | 0.28 |
+| Cold prefill ~93K | **1286 tok/s** (73s) | ~42s on his writeup |
 
-One-user coding: **85.4 tok/s**.
+One-user coding: **89.1 tok/s**.
 
-Raw: [results/bench-tp8-1017-1m.md](results/bench-tp8-1017-1m.md), [results/bench-tp8-1017-1m.json](results/bench-tp8-1017-1m.json).
+Raw: [results/bench-tp8-1017-1m-bite2048.md](results/bench-tp8-1017-1m-bite2048.md), [results/bench-tp8-1017-1m-bite2048.json](results/bench-tp8-1017-1m-bite2048.json). The older 8192-bite table is [results/bench-tp8-1017-1m.md](results/bench-tp8-1017-1m.md). Do not mix them.
 
 ## What this is not
 

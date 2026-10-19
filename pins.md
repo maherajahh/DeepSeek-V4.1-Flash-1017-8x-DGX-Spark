@@ -15,6 +15,6 @@ Verified 2026-10-19.
 | max-num-batched-tokens | `2048` (1024 will not boot with vision on) |
 | Needle | target 1048576, prompt 1042513, pass, bite 2048 |
 | Fabric | `10.99.20.1`–`.8` rank 0–7 (`FAB_IPS` overrides) |
-| Bench | Tony `bench/v41bench.py`, label `tp8-1017-1m` (earlier 8192-bite boot) |
-| Vision smoke | 32×32 red PNG → `Red` (`chatcmpl-9c40078ae228297e`) |
+| Bench | Tony `bench/v41bench.py`, label `tp8-1017-1m-bite2048` (this boot) |
+| Vision smoke | this boot, 32×32 red PNG → `Red` (`chatcmpl-8fdede4108600eaa`) |
 | Tool smoke | `get_weather` Paris, c (`chatcmpl-bc594f0258ada5f5`) |

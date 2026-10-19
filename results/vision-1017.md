@@ -9,3 +9,5 @@ Answer: `Red`
 `finish_reason=stop`. Usage: prompt_tokens 204, completion_tokens 2. Completion id `chatcmpl-9c40078ae228297e`.
 
 This is one solid-color image. It is not a vision benchmark.
+
+Same image on the 2048-bite boot, 2026-10-19. Answer `Red`. Completion id `chatcmpl-8fdede4108600eaa`. Usage: prompt_tokens 204, completion_tokens 2.
