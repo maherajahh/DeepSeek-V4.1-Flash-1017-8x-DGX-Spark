@@ -49,32 +49,38 @@ Raw: [results/bench-tp8-1017-1m.md](results/bench-tp8-1017-1m.md), [results/benc
 - Not a 1M needle proof
 - Not a vision benchmark (one red square)
 
-## Launch
+## Clone and serve
 
-Weights: Hugging Face `deepseek-ai/DeepSeek-V4.1-Flash-1017` on every node at `/var/tmp/models/DeepSeek-V4.1-Flash-1017` (48 shards).
+One path. Run these on the head. They do not stop a live container.
 
-Clone Tony’s recipe to `~/dsv41-recipe` (patches). Image: `vllm-dsv41:overlay5` (`pins.md`). The image is not published here. You need that local build.
+Weights stay at `/var/tmp/models/DeepSeek-V4.1-Flash-1017` (48 shards, official `deepseek-ai/DeepSeek-V4.1-Flash-1017`). If that tree is already complete, `fetch-weights.sh` does not download it again.
 
-Workers first (ranks 7→1), head last (rank 0). Defaults in `launch/dsv41-tp8.sh` are the official 1017 ids, not an uncensored name.
+The image is not uploaded here. `build-image.sh` clones [Tony's recipe](https://github.com/tonyd2wild/DeepSeek-V4.1-Flash-vLLM-DGX-Spark) at `a2664a7` and runs his `build/build_overlay5.sh` only when `vllm-dsv41:overlay5` is missing. If the tag is already local, it skips. Overlay5 is his last step: overlay4 has to exist first (`Dockerfile.overlay`, `build/build_overlay3.sh`, `build/build_overlay4.sh` in that same pin). Do not build those patches on a newer vLLM tree.
+
+```bash
+export FAB_IPS="10.99.20.1 10.99.20.2 10.99.20.3 10.99.20.4 10.99.20.5 10.99.20.6 10.99.20.7 10.99.20.8"
+export SSH_USER="$USER"
+./launch/doctor.sh          # must print DOCTOR_OK. does not stop anything
+./launch/fetch-weights.sh   # SKIP if every node already has 48 shards
+./launch/build-image.sh     # SKIP if vllm-dsv41:overlay5 is already local
+./launch/boot-1017-1m.sh    # stops only vllm_dsv41, then starts TP8
+curl -s http://127.0.0.1:8888/v1/models
+```
+
+Measured flags, already what the boot script exports: `GMU=0.75`, `MAXLEN=1048576`, bite `--max-num-batched-tokens 8192`. The window is set to 1,048,576. A 1M prompt at that bite is not safe. Longest measured prompt is 93,335 tokens.
+
+`doctor.sh` refuses to call the boot ready unless every node has the image tag, 48 shards, Tony's checkout at `a2664a7`, and an Up RoCE device. The launcher prints the NIC it picked. Office names (`rocep1s0f0,roceP2p1s0f0` / `enp1s0f0np0`) are the fallback when those devices are Up.
+
+Hand launch, if you are not using the boot script:
 
 ```bash
 export TEXT_ONLY=0 SERVED_NAMES="deepseek-v4.1-flash-1017 deepseek-v4.1-flash" \
   MODEL_DIR=DeepSeek-V4.1-Flash-1017 GMU=0.75 MAXLEN=1048576 EXP_NAME=boot1017-1m \
   PATCH_DIR=$HOME/dsv41-recipe/patch IMAGE=vllm-dsv41:overlay5 ENGRAM_LOCAL=0 \
-  FAB_IPS="10.99.20.1 10.99.20.2 10.99.20.3 10.99.20.4 10.99.20.5 10.99.20.6 10.99.20.7 10.99.20.8" \
-  NCCL_IB_ADDR_RANGE=10.99.20.0/24 \
+  FAB_IPS="$FAB_IPS" NCCL_IB_ADDR_RANGE=10.99.20.0/24 \
   NCCL_EXTRA="-e NCCL_MAX_NCHANNELS=8 -e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False"
-# on each worker:  ./launch/dsv41-tp8.sh <rank>
-# on head:         ./launch/dsv41-tp8.sh 0
+# workers first, ranks 7→1, then the head:  ./launch/dsv41-tp8.sh <rank>
 ```
-
-Or, on the head, after editing `FAB_IPS` / `SSH_USER` if needed:
-
-```bash
-./launch/boot-1017-1m.sh
-```
-
-That script copies `launch/dsv41-tp8.sh` to each node as `~/dsv41-tp8.sh` and starts it. It stops only `vllm_dsv41`.
 
 ## Credits
 

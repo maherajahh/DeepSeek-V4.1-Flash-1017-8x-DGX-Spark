@@ -96,14 +96,43 @@ HOST_IP="${FAB[$((BASE + NODE_RANK))]}"
 HEAD_IP="${FAB[$BASE]}"; MPORT="${MPORT:-29551}"; PORT="${PORT:-8888}"
 [ "$NODE_RANK" = "0" ] && HEADLESS="" || HEADLESS="--headless"
 
-# RoCEv2 GID index is per-NIC and moves across firmware updates -- probe it (from our GLM launcher).
+# RoCEv2 GID index is per-NIC and moves across firmware updates.
+# Office names are the fallback. If those two devices are Up, use them.
+# Otherwise take the Up RoCE pair from ibdev2netdev and print it.
+OFFICE_HCA="rocep1s0f0,roceP2p1s0f0"
+OFFICE_IF="enp1s0f0np0"
+if [ -n "${NCCL_IB_HCA:-}" ]; then
+  NCCL_HCA="$NCCL_IB_HCA"
+  NCCL_IF="${NCCL_SOCKET_IFNAME:-$OFFICE_IF}"
+  NIC_SRC=env
+elif ibdev2netdev 2>/dev/null | grep -q 'rocep1s0f0 port 1 ==> enp1s0f0np0 (Up)' \
+  && ibdev2netdev 2>/dev/null | grep -q 'roceP2p1s0f0 port 1 ==> enP2p1s0f0np0 (Up)'; then
+  NCCL_HCA="$OFFICE_HCA"
+  NCCL_IF="$OFFICE_IF"
+  NIC_SRC=office
+else
+  mapfile -t _up < <(ibdev2netdev 2>/dev/null | awk '/\(Up\)/{print $1" "$5}')
+  if [ "${#_up[@]}" -ge 1 ]; then
+    NCCL_HCA="${_up[0]%% *}"
+    NCCL_IF="${_up[0]##* }"
+    if [ "${#_up[@]}" -ge 2 ]; then
+      NCCL_HCA="$NCCL_HCA,${_up[1]%% *}"
+    fi
+    NIC_SRC=probed
+  else
+    NCCL_HCA="$OFFICE_HCA"
+    NCCL_IF="$OFFICE_IF"
+    NIC_SRC=fallback
+  fi
+fi
+HCA0="${NCCL_HCA%%,*}"
 GIDX=3
 for i in 0 1 2 3 4 5 6 7; do
-  t=$(cat /sys/class/infiniband/rocep1s0f0/ports/1/gid_attrs/types/$i 2>/dev/null)
-  g=$(cat /sys/class/infiniband/rocep1s0f0/ports/1/gids/$i 2>/dev/null)
+  t=$(cat "/sys/class/infiniband/$HCA0/ports/1/gid_attrs/types/$i" 2>/dev/null)
+  g=$(cat "/sys/class/infiniband/$HCA0/ports/1/gids/$i" 2>/dev/null)
   case "$t" in *"RoCE v2"*) case "$g" in *ffff*) GIDX=$i; break ;; esac ;; esac
 done
-echo "rank $NODE_RANK/$TP (node index $((BASE + NODE_RANK)))  ip=$HOST_IP  head=$HEAD_IP:$PORT  NCCL_IB_GID_INDEX=$GIDX"
+echo "rank $NODE_RANK/$TP (node index $((BASE + NODE_RANK)))  ip=$HOST_IP  head=$HEAD_IP:$PORT  nic=$NCCL_HCA ifname=$NCCL_IF source=$NIC_SRC NCCL_IB_GID_INDEX=$GIDX"
 
 # ---- preflight (fail loudly; never let Docker invent an empty dir over a missing mount) ----
 test -f "$MODEL_HOST/config.json" || die "MODEL MISSING at $MODEL_HOST" 3
@@ -182,9 +211,9 @@ $DOCKER run --gpus all -d --name "$NAME" --restart no \
   -e VLLM_USE_RUST_FRONTEND=$RUST_FE -e VLLM_HAS_FLASHINFER_CUBIN=1 \
   $ENGRAM_ENV $GRAPH_ENV \
   -e TORCH_CUDA_ARCH_LIST=12.1a -e FLASHINFER_CUDA_ARCH_LIST=12.1a -e FLASHINFER_DISABLE_VERSION_CHECK=1 \
-  -e NCCL_NET=IB -e NCCL_IB_DISABLE=0 -e NCCL_IB_HCA=rocep1s0f0,roceP2p1s0f0 -e NCCL_IB_GID_INDEX=$GIDX \
+  -e NCCL_NET=IB -e NCCL_IB_DISABLE=0 -e NCCL_IB_HCA=$NCCL_HCA -e NCCL_IB_GID_INDEX=$GIDX \
   -e NCCL_IB_ROCE_VERSION_NUM=2 -e NCCL_IB_ADDR_FAMILY=AF_INET -e NCCL_IB_ADDR_RANGE=${NCCL_IB_ADDR_RANGE:-10.99.20.0/24} \
-  -e NCCL_SOCKET_IFNAME=enp1s0f0np0 -e GLOO_SOCKET_IFNAME=enp1s0f0np0 -e TP_SOCKET_IFNAME=enp1s0f0np0 -e MN_IF_NAME=enp1s0f0np0 \
+  -e NCCL_SOCKET_IFNAME=$NCCL_IF -e GLOO_SOCKET_IFNAME=$NCCL_IF -e TP_SOCKET_IFNAME=$NCCL_IF -e MN_IF_NAME=$NCCL_IF \
   -e NCCL_CROSS_NIC=1 -e NCCL_NVLS_ENABLE=0 -e NCCL_IB_MERGE_NICS=0 -e NCCL_CUMEM_ENABLE=0 \
   -e NCCL_IGNORE_CPU_AFFINITY=1 ${NCCL_BUFFSIZE:+-e NCCL_BUFFSIZE=$NCCL_BUFFSIZE} -e NCCL_DEBUG=WARN -e TORCH_NCCL_ASYNC_ERROR_HANDLING=1 \
   $NCCL_EXTRA \

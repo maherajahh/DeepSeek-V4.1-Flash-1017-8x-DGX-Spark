@@ -6,7 +6,7 @@ Verified 2026-10-19.
 |------|--------|
 | Weights | `deepseek-ai/DeepSeek-V4.1-Flash-1017` |
 | Path | `/var/tmp/models/DeepSeek-V4.1-Flash-1017` (48/48 shards) |
-| Tony recipe commit | `a2664a7` |
+| Tony recipe commit | `a2664a7e4ac7bc823ef29c8d7725abfe4d286f8a` |
 | vLLM image | `vllm-dsv41:overlay5` |
 | Image id | `sha256:c92feb5ffab6f15cb5d1330abd448ef1664a6f13bfeae616982b73bf2a4baaf9` |
 | Server fingerprint | `vllm-0.28.1rc1.dev388+g8a728663c-tp8-d428ca86` |
