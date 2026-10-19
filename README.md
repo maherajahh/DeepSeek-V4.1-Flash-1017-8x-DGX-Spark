@@ -13,9 +13,9 @@ Tony published 1017 on **four** Sparks (`boot1017g`, 300K). Magnus published 8-w
 | Model | `deepseek-ai/DeepSeek-V4.1-Flash-1017` (official) |
 | Hardware | 8× DGX Spark, dual fat rear links. Measured fabric `10.99.20.1`–`.8`. Edit `FAB_IPS` for another lab. |
 | Engine | vLLM `vllm-dsv41:overlay5`, Tony patches, TP=8 |
-| Vision | on (`TEXT_ONLY=0`). This boot: 32×32 red PNG → `Red` (`chatcmpl-8fdede4108600eaa`). |
-| Tools | one call on this boot: `get_weather` for Paris, celsius. Not a tool-call eval. |
-| Context window | Cap `1048576`. Needle target 1,048,576 passed at **1,042,513** prompt tokens. See [results/needle-1m.md](results/needle-1m.md). |
+| Vision | on. This boot, Tony's demo: 3 images and 4 tool checks, 7/7. See [results/vision-tools-2048.md](results/vision-tools-2048.md). |
+| Tools | same file. One weather call is not the whole check. Not a benchmark. |
+| Context window | Cap `1048576`. Needle passed near the start, middle, and end. Prompts were 1,042,741 / 1,042,513 / 1,042,394 tokens. See [results/needle-1m.md](results/needle-1m.md). |
 | Bite | `--max-num-batched-tokens 2048`. 1024 will not boot with vision on (image token budget is 1025). |
 | API | head `:8888`, ids `deepseek-v4.1-flash-1017` and `deepseek-v4.1-flash` |
 
@@ -35,6 +35,7 @@ Same harness Tony used for 1017g. Counting ceiling excluded from the 8-category 
 | C6 | **173.0** | 165.7 |
 | C1 mean TTFT (s) | **0.26** | 0.28 |
 | Cold prefill ~93K | **1286 tok/s** (73s) | ~42s on his writeup |
+| Needle read, 1,042,513 tokens | **815.5 tok/s** (1278s) | not in his 1017g table |
 
 One-user coding: **89.1 tok/s**.
 
@@ -46,9 +47,9 @@ Raw: [results/bench-tp8-1017-1m-bite2048.md](results/bench-tp8-1017-1m-bite2048.
 - Not Magnus’s uncensored checkpoint
 - Not TensorFold / EXL3
 - Not “we invented 8-wide DeepSeek”
-- Not a vision benchmark (one red square)
-- Not a tool-call benchmark (one call)
-- Not "the prompt was exactly 1,048,576 tokens" (the harness used 1,042,513; the cap is 1,048,576)
+- Not a vision benchmark (Tony's 3-image demo passed; that is not a vision suite)
+- Not a tool-call benchmark (his 4 tool checks passed; that is not a suite)
+- Not "the prompt was exactly 1,048,576 tokens" (the three prompts were 1,042,741 / 1,042,513 / 1,042,394; the cap is 1,048,576)
 
 ## Clone and serve
 
@@ -56,7 +57,7 @@ One path. Run these on the head. They do not stop a live container.
 
 Weights stay at `/var/tmp/models/DeepSeek-V4.1-Flash-1017` (48 shards, official `deepseek-ai/DeepSeek-V4.1-Flash-1017`). If that tree is already complete, `fetch-weights.sh` does not download it again.
 
-The image is not uploaded here. `build-image.sh` clones [Tony's recipe](https://github.com/tonyd2wild/DeepSeek-V4.1-Flash-vLLM-DGX-Spark) at `a2664a7` and runs his `build/build_overlay5.sh` only when `vllm-dsv41:overlay5` is missing. If the tag is already local, it skips. Overlay5 is his last step: overlay4 has to exist first (`Dockerfile.overlay`, `build/build_overlay3.sh`, `build/build_overlay4.sh` in that same pin). Do not build those patches on a newer vLLM tree.
+The image is not uploaded here. Empty machines follow [docs/empty-fleet.md](docs/empty-fleet.md): Tony at `a2664a7`, overlay1 then overlay3 then overlay4, then `./launch/build-image.sh` for overlay5. Overlay1 is not a single script. Do not build those patches on a newer vLLM tree.
 
 ```bash
 export FAB_IPS="10.99.20.1 10.99.20.2 10.99.20.3 10.99.20.4 10.99.20.5 10.99.20.6 10.99.20.7 10.99.20.8"

@@ -1,3 +1,5 @@
+**Not the serving boot.** Bite on this file is 8192. The live boot is bite 2048. Do not quote these tok/s as the current server.
+
 ## tp8-1017-1m (2026-10-19T05:12:50Z)
 
 office 8x GB10 TP8 official DeepSeek-V4.1-Flash-1017 maxlen=1048576 gmu=0.75 overlay5
