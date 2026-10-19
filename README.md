@@ -23,19 +23,19 @@ The serving bite is 2048. A 1024 bite dies at startup with vision on. The speed 
 
 ## Measured (Tony `v41bench.py`, prompt set v1, temperature 0, thinking off)
 
-Same harness Tony used for 1017g. Counting ceiling excluded from the 8-category mean. His column is 4 Sparks at 300K, bite not ours. This column is 8 Sparks, window cap 1,048,576, bite 2048. Extra boxes help. They do not double decode. Long prompts are slower at this bite than on the earlier 8192 boot. This is not a TensorFold comparison. Tony’s TensorFold 4-Spark lane is still faster than this vLLM lane.
+Same harness Tony used for 1017g. Counting ceiling excluded from the 8-category mean. His vLLM column is 4 Sparks at 300K. His TensorFold column is also 4 Sparks, a different engine, and compressed weights, not this boot. This column is 8 Sparks, cap 1,048,576, bite 2048. His TensorFold one-user number is higher. Do not read the vLLM column as the race.
 
-| C | this boot (8×, cap 1M, bite 2048) | Tony 1017g (4×, 300K) |
-|---|---|---|
-| C1 aggregate tok/s | **54.8** | 48.5 |
-| C2 | **87.3** | 76.6 |
-| C3 | **117.9** | 102.6 |
-| C4 | **143.8** | 123.2 |
-| C5 | **158.8** | 144.6 |
-| C6 | **173.0** | 165.7 |
-| C1 mean TTFT (s) | **0.26** | 0.28 |
-| Cold prefill ~93K | **1286 tok/s** (73s) | ~42s on his writeup |
-| Needle read, 1,042,513 tokens | **815.5 tok/s** (1278s) | not in his 1017g table |
+| C | this boot (8×, cap 1M, bite 2048) | Tony vLLM 1017g (4×, 300K) | Tony TensorFold (4×, his page) |
+|---|---|---|---|
+| C1 aggregate tok/s | **54.8** | 48.5 | **93.6** |
+| C2 | **87.3** | 76.6 | not published as this row |
+| C3 | **117.9** | 102.6 | not published as this row |
+| C4 | **143.8** | 123.2 | not published as this row |
+| C5 | **158.8** | 144.6 | not published as this row |
+| C6 | **173.0** | 165.7 | not a 6-user number (he reports 270.8 at 16 users) |
+| C1 mean TTFT (s) | **0.26** | 0.28 | |
+| Cold prefill ~93K | **1286 tok/s** (73s) | ~42s on his writeup | |
+| Needle read, 1,042,513 tokens | **815.5 tok/s** (1278s) | not in his 1017g table | |
 
 One-user coding: **89.1 tok/s**.
 
@@ -55,7 +55,7 @@ Raw: [results/bench-tp8-1017-1m-bite2048.md](results/bench-tp8-1017-1m-bite2048.
 
 One path. Run these on the head. They do not stop a live container.
 
-Weights stay at `/var/tmp/models/DeepSeek-V4.1-Flash-1017` (48 shards, official `deepseek-ai/DeepSeek-V4.1-Flash-1017`). If that tree is already complete, `fetch-weights.sh` does not download it again.
+Weights stay at `/var/tmp/models/DeepSeek-V4.1-Flash-1017` (48 shards). The copy we serve is Hugging Face `deepseek-ai/DeepSeek-V4.1-Flash-1017` at `1bae0e1088993b9b82de08f59de5be5a34e42170`. If that tree is already complete, `fetch-weights.sh` does not download it again.
 
 The image is not uploaded here. Empty machines follow [docs/empty-fleet.md](docs/empty-fleet.md): Tony at `a2664a7`, overlay1 then overlay3 then overlay4, then `./launch/build-image.sh` for overlay5. Overlay1 is not a single script. Do not build those patches on a newer vLLM tree.
 
@@ -66,7 +66,7 @@ export SSH_USER="$USER"
 ./launch/fetch-weights.sh   # SKIP if every node already has 48 shards
 ./launch/build-image.sh     # SKIP if vllm-dsv41:overlay5 is already local
 ./launch/boot-1017-1m.sh    # stops only vllm_dsv41, then starts TP8
-curl -s http://127.0.0.1:8888/v1/models
+./launch/smoke.sh           # must print SMOKE_OK. does not send a long prompt
 ```
 
 Measured flags in `launch/boot-1017-1m.sh`: `GMU=0.75`, `MAXLEN=1048576`, bite `MAX_BATCHED=2048`. 1024 will not start with vision on. The needle that passed used this 2048 bite.
